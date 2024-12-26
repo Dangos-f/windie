@@ -1,0 +1,261 @@
+import pygame
+import random
+import math
+
+# Константы
+WIDTH, HEIGHT = 1000, 1000  # Размер окна
+FPS = 60
+PLAYER_SPEED = 5
+BULLET_SPEED = 10
+ENEMY_SPEED = 2
+WINDOW_BORDER = 50
+MAX_LIVES = 3
+ENEMY_SPAWN_DELAY = 1000  # Задержка спавна врагов в миллисекундах
+INVINCIBILITY_TIME = 3000  # Время бессмертия в миллисекундах
+BULLET_SPAWN_DELAY = 200  # Задержка между выстрелами (в миллисекундах)
+BOSS_SPAWN_TIME = 20000  # Время появления босса в миллисекундах
+BOSS_HEALTH = 10  # Здоровье босса
+
+# Цвета
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+
+# Класс игрока
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((50, 50))
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        self.health = MAX_LIVES
+        self.invincible = False
+        self.invincibility_start_time = 0
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_a]:  # Влево
+            self.rect.x -= PLAYER_SPEED
+        if keys[pygame.K_d]:  # Вправо
+            self.rect.x += PLAYER_SPEED
+        if keys[pygame.K_w]:  # Вверх
+            self.rect.y -= PLAYER_SPEED
+        if keys[pygame.K_s]:  # Вниз
+            self.rect.y += PLAYER_SPEED
+
+        # Ограничения по краям окна
+        self.rect.x = max(WINDOW_BORDER, min(WIDTH - WINDOW_BORDER - self.rect.width, self.rect.x))
+        self.rect.y = max(WINDOW_BORDER, min(HEIGHT - WINDOW_BORDER - self.rect.height, self.rect.y))
+
+        # Проверка на бессмертие
+        if self.invincible:
+            if pygame.time.get_ticks() - self.invincibility_start_time > INVINCIBILITY_TIME:
+                self.invincible = False
+
+# Класс пули игрока
+class PlayerBullet(pygame.sprite.Sprite):
+    def __init__(self, x, y, angle):
+        super().__init__()
+        self.image = pygame.Surface((10, 10))
+        self.image.fill(WHITE)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.angle = angle
+
+    def update(self):
+        self.rect.x += BULLET_SPEED * math.cos(self.angle)
+        self.rect.y += BULLET_SPEED * math.sin(self.angle)
+
+# Класс вражеской пули
+class EnemyBullet(pygame.sprite.Sprite):
+    def __init__(self, x, y, angle):
+        super().__init__()
+        self.image = pygame.Surface((10, 10))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.angle = angle
+
+    def update(self):
+        self.rect.x += BULLET_SPEED * math.cos(self.angle)
+        self.rect.y += BULLET_SPEED * math.sin(self.angle)
+
+# Класс врага
+class Enemy(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((40, 40))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect(center=self.spawn_position())
+        self.health = 1  # Враг имеет одну жизнь
+
+    def spawn_position(self):
+        side = random.choice(['top', 'bottom', 'left', 'right'])
+        if side == 'top':
+            return (random.randint(WINDOW_BORDER, WIDTH - WINDOW_BORDER), 0)
+        elif side == 'bottom':
+            return (random.randint(WINDOW_BORDER, WIDTH - WINDOW_BORDER), HEIGHT)
+        elif side == 'left':
+            return (0, random.randint(WINDOW_BORDER, HEIGHT - WINDOW_BORDER))
+        elif side == 'right':
+            return (WIDTH, random.randint(WINDOW_BORDER, HEIGHT - WINDOW_BORDER))
+
+    def update(self):
+        # Простая логика движения врага к игроку
+        player_pos = player.rect.center
+        if self.rect.x < player_pos[0]:
+            self.rect.x += ENEMY_SPEED
+        if self.rect.x > player_pos[0]:
+            self.rect.x -= ENEMY_SPEED
+        if self.rect.y < player_pos[1]:
+            self.rect.y += ENEMY_SPEED
+        if self.rect.y > player_pos[1]:
+            self.rect.y -= ENEMY_SPEED
+
+# Класс босса
+class Boss(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((60, 60))
+        self.image.fill(BLUE)
+        self.rect = self.image.get_rect(center=self.spawn_position())
+        self.health = BOSS_HEALTH
+        self.last_shot_time = 0
+
+    def spawn_position(self):
+        # Босс появляется в центре экрана
+        return (WIDTH // 2, HEIGHT // 2)
+
+    def update(self):
+        # Босс не движется, просто стоит на месте
+        # Проверка на стрельбу
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_shot_time > BULLET_SPAWN_DELAY:  # Проверка задержки между выстрелами
+            self.shoot()
+            self.last_shot_time = current_time
+
+    def shoot(self):
+        angle = math.atan2(player.rect.centery - self.rect.centery,
+                           player.rect.centerx - self.rect.centery)
+        bullet = EnemyBullet(self.rect.centerx, self.rect.centery, angle)
+        all_sprites.add(bullet)
+        enemy_bullets.add(bullet)
+
+# Инициализация игры
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Windowkill")
+clock = pygame.time.Clock()
+
+# Группы спрайтов
+all_sprites = pygame.sprite.Group()
+bullets = pygame.sprite.Group()
+enemies = pygame.sprite.Group()
+enemy_bullets = pygame.sprite.Group()
+
+# Создание игрока
+player = Player()
+all_sprites.add(player)
+
+# Переменные для управления спавном врагов и стрельбой
+enemy_spawn_time = pygame.time.get_ticks()  # Время последнего спавна врага
+last_bullet_time = 0  # Время последнего выстрела
+boss_spawn_time = 0  # Время появления босса
+boss = None  # Переменная для босса
+
+# Основной игровой цикл
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # Обновление
+    all_sprites.update()
+
+    # Проверка на удержание кнопки мыши для стрельбы
+    mouse_buttons = pygame.mouse.get_pressed()
+    if mouse_buttons[0]:  # Если ЛКМ удерживается
+        current_time = pygame.time.get_ticks()
+        if current_time - last_bullet_time > BULLET_SPAWN_DELAY:  # Проверка задержки между выстрелами
+            angle = math.atan2(pygame.mouse.get_pos()[1] - player.rect.centery,
+                               pygame.mouse.get_pos()[0] - player.rect.centerx)
+            bullet = PlayerBullet(player.rect.centerx, player.rect.centery, angle)
+            all_sprites.add(bullet)
+            bullets.add(bullet)
+            last_bullet_time = current_time  # Обновляем время последнего выстрела
+
+    # Проверка на столкновение с врагами
+    if not player.invincible and pygame.sprite.spritecollide(player, enemies, False):
+        player.health -= 1
+        if player.health < 0:  # Убедимся, что здоровье не становится отрицательным
+            player.health = 0
+        player.invincible = True
+        player.invincibility_start_time = pygame.time.get_ticks()
+
+    # Проверка на попадание пули игрока в врага
+    for bullet in bullets:
+        hit_enemies = pygame.sprite.spritecollide(bullet, enemies, False)
+        for enemy in hit_enemies:
+            enemy.health -= 1  # Уменьшаем здоровье врага
+            bullet.kill()  # Удаляем пулю
+            if enemy.health <= 0:
+                enemy.kill()  # Удаляем врага, если его здоровье достигло нуля
+
+    # Проверка на попадание вражеских пуль в игрока
+    for bullet in enemy_bullets:
+        if bullet.rect.colliderect(player.rect):
+            player.health -= 1
+            if player.health < 0:  # Убедимся, что здоровье не становится отрицательным
+                player.health = 0
+            bullet.kill()  # Удаляем пулю, если она попала в игрока
+
+    # Проверка на попадание пули игрока в босса
+    if boss is not None:  # Проверяем, существует ли босс
+        for bullet in bullets:
+            if bullet.rect.colliderect(boss.rect):
+                boss.health -= 1  # Уменьшаем здоровье босса
+                bullet.kill()  # Удаляем пулю
+                if boss.health <= 0:
+                    boss.health = 0  # Убедимся, что здоровье не становится отрицательным
+                    boss.kill()  # Удаляем босса, если его здоровье достигло нуля
+
+    # Спавн врагов поочередно
+    if pygame.time.get_ticks() - enemy_spawn_time > ENEMY_SPAWN_DELAY and len(enemies) < 5:
+        enemy = Enemy()
+        # Проверяем, чтобы враг не спавнился слишком близко к игроку
+        while enemy.rect.colliderect(player.rect):
+            enemy = Enemy()
+        all_sprites.add(enemy)
+        enemies.add(enemy)
+        enemy_spawn_time = pygame.time.get_ticks()  # Обновляем время последнего спавна
+
+    # Спавн босса
+    if boss is None and pygame.time.get_ticks() - boss_spawn_time > BOSS_SPAWN_TIME:
+        boss = Boss()
+        all_sprites.add(boss)
+
+    # Проверка окончания игры
+    if player.health <= 0:
+        print("Game Over!")
+        running = False
+
+    # Рендеринг
+    screen.fill(BLACK)
+    all_sprites.draw(screen)
+
+    # Отображение жизней
+    font = pygame.font.Font(None, 36)
+    health_text = font.render(f'Lives: {player.health}', True, WHITE)
+    screen.blit(health_text, (10, 10))
+
+    # Отображение здоровья босса, если он существует
+    if boss is not None:
+        boss_health_text = font.render(f'Boss Health: {boss.health}', True, WHITE)
+        screen.blit(boss_health_text, (10, 50))
+
+    # Обновление экрана
+    pygame.display.flip()
+    clock.tick(FPS)
+
+pygame.quit()
